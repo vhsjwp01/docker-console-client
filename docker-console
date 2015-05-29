@@ -75,7 +75,7 @@ check_command() {
 #
 if [ ${exit_code} -eq ${SUCCESS} ]; then
 
-    for command in awk egrep host nc sed ; do
+    for command in awk egrep nc ping sed ; do
         check_command "${command}"
         let exit_code=${exit_code}+${return_code}
     done
@@ -87,10 +87,10 @@ fi
 #
 if [ ${exit_code} -eq ${SUCCESS} ]; then
 
-    if [ "${1}" != "" ]; then 
-        let ipv4_check=`${my_host} "${1}" | ${my_egrep} -ic "has address|domain name pointer"`
+    if [ "${1}" != "" -a ${#} -eq 1 ]; then 
+        ${my_ping} -c 1 "${1}" > /dev/null 2>&1
 
-        if [ ${ipv4_check} -eq 0 ]; then
+        if [ ${?} -ne 0 ]; then
             err_msg="Invalid host"
             exit_code=${ERROR}
         else
