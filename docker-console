@@ -104,6 +104,20 @@ fi
 #
 #fi
 
+# WHAT: Make sure we have necessary arguments
+# WHY:  Cannot proceed otherwise
+#
+if [ ${exit_code} -eq ${SUCCESS} ]; then
+
+    if [ "${1}" != "" -a ${#} -eq 1 ]; then 
+        host="${1}"
+    else
+        err_msg="Please provide a valid hostname or IPv4 address"
+        exit_code=${ERROR}
+    fi
+
+fi
+
 # WHAT: Try to connect to the remote docker console manager of the provided host
 # WHY:  The reason we are here
 #
