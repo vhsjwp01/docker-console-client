@@ -1,0 +1,156 @@
+#!/bin/bash
+#set -x
+
+################################################################################
+# CONSTANTS
+################################################################################
+#
+
+TERM=vt100
+PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin
+export TERM PATH
+
+SUCCESS=0
+ERROR=1
+
+DOCKER_CONSOLE_PORT=42002
+STDOUT_OFFSET="    "
+
+SCRIPT_NAME="${0}"
+
+# netcat timeout in seconds"
+TIMEOUT="28800"
+
+USAGE="${SCRIPT_NAME} <valid host or IPv4 address>"
+
+################################################################################
+# VARIABLES
+################################################################################
+#
+
+exit_code=${SUCCESS}
+err_msg=""
+
+################################################################################
+# SUBROUTINES
+################################################################################
+#
+# NAME: check_command
+# WHAT: A subroutine to check the contents of lexically scoped ${1}
+# WHY:  Lexically scoped ${1} should not be null, otherwise the command for
+#       which we are searching is not present via the defined ${PATH} and we
+#       should complain
+#
+check_command() {
+    return_code=${SUCCESS}
+    my_command=`echo "${1}" | sed -e 's?\`??g'`
+
+    if [ "${my_command}" != "" ]; then
+        my_command_check=`unalias "${1}" 2> /dev/null ; which "${1}" 2> /dev/null`
+
+        if [ "${my_command_check}" = "" ]; then
+            err_msg="ERROR:  Could not locate the command ${my_command} on this system"
+            return_code=${ERROR}
+        else
+            my_command=`echo "${my_command}" | sed -e 's/-/_/g'`
+            eval my_${my_command}="${my_command_check}"
+        fi
+
+    else
+        err_msg="No command was specified"
+        return_code=${ERROR}
+    fi
+
+    return ${return_code}
+}
+
+#
+# ------------------------------------------------------------------------------
+#
+
+################################################################################
+# MAIN
+################################################################################
+#
+
+# WHAT: Make sure we have some needed commands
+# WHY:  Cannot proceed otherwise
+#
+if [ ${exit_code} -eq ${SUCCESS} ]; then
+
+    for command in awk egrep nc ping sed ; do
+        check_command "${command}"
+        let exit_code=${exit_code}+${return_code}
+    done
+
+fi
+
+## WHAT: Make sure we have necessary arguments
+## WHY:  Cannot proceed otherwise
+##
+#if [ ${exit_code} -eq ${SUCCESS} ]; then
+#
+#    if [ "${1}" != "" -a ${#} -eq 1 ]; then 
+#        ${my_ping} -c 1 "${1}" > /dev/null 2>&1
+#
+#        if [ ${?} -ne 0 ]; then
+#            err_msg="Invalid host"
+#            exit_code=${ERROR}
+#        else
+#            host="${1}"
+#        fi
+#
+#    else
+#        err_msg="Please provide a valid hostname or IPv4 address"
+#        exit_code=${ERROR}
+#    fi
+#
+#fi
+
+# WHAT: Make sure we have necessary arguments
+# WHY:  Cannot proceed otherwise
+#
+if [ ${exit_code} -eq ${SUCCESS} ]; then
+
+    if [ "${1}" != "" -a ${#} -eq 1 ]; then 
+        host="${1}"
+    else
+        err_msg="Please provide a valid hostname or IPv4 address"
+        exit_code=${ERROR}
+    fi
+
+fi
+
+# WHAT: Try to connect to the remote docker console manager of the provided host
+# WHY:  The reason we are here
+#
+if [ ${exit_code} -eq ${SUCCESS} ]; then
+
+    # See if netcat requires units for timeout:
+    let timeout_unit_check=$(${my_nc} -w ${TIMEOUT}s 2>&1 | egrep -c "timeout cannot be negative|timeout invalid:")
+
+    if [ ${timeout_unit_check} -eq 0 ]; then
+        ${my_nc} -w ${TIMEOUT}s ${host} ${DOCKER_CONSOLE_PORT}
+    else
+        ${my_nc} -w ${TIMEOUT} ${host} ${DOCKER_CONSOLE_PORT}
+    fi
+
+fi
+
+# WHAT: Complain if necessary and exit
+# WHY:  Success or failure, either way we are through
+#
+if [ ${exit_code} -ne ${SUCCESS} ]; then
+
+    if [ "${err_msg}" != "" ]; then
+        echo
+        echo -ne "${STDOUT_OFFSET}ERROR:  ${err_msg} ... processing halted\n"
+        echo
+    fi
+
+    echo
+    echo -ne "${STDOUT_OFFSET}USAGE:  ${USAGE}\n"
+    echo
+fi
+
+exit ${exit_code}
